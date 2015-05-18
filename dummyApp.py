@@ -4,10 +4,29 @@ import os
 import sys
 import web
 import etcd
+import json
+import socket
 import getopt
 import random
 
 urls        = ('/','root')
+
+class Realserver:
+    name = ''
+    version = ''
+    ip = ''
+    port = ''
+
+    def __init__(self, name, ip, port, version=''):
+        self.name    = name
+        self.ip      = ip
+        self.port    = int(port)
+        self.version = version
+
+    def __str__(self):
+        return json.dumps(vars(self),sort_keys=True, indent=4)
+
+
 
 class root:
     def __init__(self):
@@ -56,8 +75,9 @@ def main(argv):
     ip   = '127.' + str(random.randint(0,255)) + '.' + str(random.randint(0,255)) + '.' + str(random.randint(0,255))
 
     try:
-        etcdKey   = '{}{}/realserver/server_{}'.format(etcdPrefix, app_version, port)
-        etcdValue = '{}:{}'.format(ip,port)
+        name      = '{}_{}'.format(socket.gethostname(), port)
+        etcdKey   = '{}{}/realserver/{}'.format(etcdPrefix, app_version, name)
+        etcdValue = Realserver(name, ip, port)
 
         etcd_client = etcd.Client(host='127.0.0.1', port=2379, protocol='http')
         etcd_client.write(etcdKey, etcdValue, ttl=3600)
