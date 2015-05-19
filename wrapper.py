@@ -28,6 +28,7 @@ class Realserver:
         connect = '{}:{}'.format(self.ip, self.port)
         return '     server {} {} maxconn 32 check weight '.format(self.name, connect)
 
+
 def getWeight(component, version):
     key  = '/haproxy/backends/{}/{}/weight'.format(component,version)
     try:
@@ -93,13 +94,11 @@ def getStats(socketFile):
     return state
 
 
-
 # stop running haproxy
 subprocess.Popen(['/usr/bin/pkill', 'haproxy'])
 
 
-client = etcd.Client(host='127.0.0.1', port=2379, protocol='http')
-
+client     = etcd.Client(host='127.0.0.1', port=2379, protocol='http')
 pid        = 90000000
 checksum   = None
 template   = 'template/haproxy.template'
@@ -133,7 +132,7 @@ while True:
             name      = tmp[6]
             j         = json.loads(child.value)
             j['name'] = name 
-            server  = Realserver(**j)
+            server    = Realserver(**j)
 
             if app not in backends:
                 backends[app] = {}
