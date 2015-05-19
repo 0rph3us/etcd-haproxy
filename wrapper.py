@@ -207,9 +207,7 @@ while True:
     if doReload is False:
         if command:
             print 'Reconfigure HAProxy on the fly'
-            print command
-            status = commands.getstatusoutput('echo "%s" | socat stdio %s' % ( '; '.join(command), socketFile))
-            print status
+            sendToSocket(socketFile, '; '.join(command))
 
     print 'sleep'
     time.sleep(5)
