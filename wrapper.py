@@ -39,15 +39,20 @@ def getWeight(component, version):
     except etcd.EtcdKeyNotFound:
         return 0
 
-def getStats(socketFile):
+
+def sendToSocket(socketFile, command):
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+
+    if not command.endswith('\n'):
+        command += '\n'
+
     try:
         s.connect(socketFile)
     except IOError as e:
         print "I/O error({0}): {1}".format(e.errno, e.strerror)
-        return {}
+        return None
 
-    s.send('show stat\n')
+    s.send(command)
     result = ''
     buf = ''
     buf = s.recv(RECV_SIZE)
@@ -55,6 +60,14 @@ def getStats(socketFile):
       result += buf
       buf = s.recv(RECV_SIZE)
     s.close()
+
+    return result
+
+
+def getStats(socketFile):
+    result = sendToSocket(socketFile, 'show stat')
+    if result is None:
+        return {}
 
     lines = result.split('\n')
     state, servers = {}, {}
