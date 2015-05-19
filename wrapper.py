@@ -1,14 +1,11 @@
 #!/usr/bin/python -W all
 
-import os
 import etcd
 import time
 import json
 import socket
 import hashlib
-import commands
 import subprocess
-from collections import namedtuple
 
 # global variables
 RECV_SIZE = 1024
