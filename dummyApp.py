@@ -13,15 +13,14 @@ urls        = ('/','root')
 
 class Realserver:
     name = ''
-    version = ''
     ip = ''
     port = ''
 
-    def __init__(self, name, ip, port, version=''):
+    def __init__(self, name, ip, port):
         self.name    = name
         self.ip      = ip
         self.port    = int(port)
-        self.version = version
+#        self.version = version
 
     def __str__(self):
         return json.dumps(vars(self),sort_keys=True, indent=4)
@@ -75,15 +74,15 @@ def main(argv):
     ip   = '127.' + str(random.randint(0,255)) + '.' + str(random.randint(0,255)) + '.' + str(random.randint(0,255))
 
     try:
-        name      = '{}_{}'.format(socket.gethostname(), port)
+        name      = '{}-{}_{}'.format(socket.gethostname(), app_version, port)
         etcdKey   = '{}{}/realserver/{}'.format(etcdPrefix, app_version, name)
         etcdValue = Realserver(name, ip, port)
 
         etcd_client = etcd.Client(host='127.0.0.1', port=2379, protocol='http')
         etcd_client.write(etcdKey, etcdValue, ttl=3600)
 
-    except:
-        print 'no etcd'
+    except Exception as e:
+        print 'Error: {}'.format(e)
         sys.exit()
 
     try:
