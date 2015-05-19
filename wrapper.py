@@ -10,6 +10,9 @@ import commands
 import subprocess
 from collections import namedtuple
 
+# global variables
+RECV_SIZE = 1024
+
 class Realserver:
     name = ''
     ip = ''
@@ -37,26 +40,36 @@ def getWeight(component, version):
         return 0
 
 def getStats(socketFile):
-    status = commands.getstatusoutput('echo "show stat" | socat {} stdio'.format(socketFile))
-    lines = status[1].split('\n')
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        s.connect(socketFile)
+    except IOError as e:
+        print "I/O error({0}): {1}".format(e.errno, e.strerror)
+        return {}
+
+    s.send('show stat\n')
+    result = ''
+    buf = ''
+    buf = s.recv(RECV_SIZE)
+    while buf:
+      result += buf
+      buf = s.recv(RECV_SIZE)
+    s.close()
+
+    lines = result.split('\n')
     state, servers = {}, {}
-    for l in lines:
+    for line in lines:
+        values = line.split(',')
 
-        vals = l.split(',')
-        if socketFile in l or len(vals) == 1:
+        if values[0].startswith('#') or values[0] == '':
             continue
 
-        if vals[0].startswith('#') or vals[0] == '':
+        if values[1] == 'FRONTEND':
+            continue
+        elif values[1] == 'BACKEND':
             continue
 
-        if vals[1] == 'FRONTEND':
-            end = 'f'
-            continue
-        elif vals[1] == 'BACKEND':
-            end = 'b'
-            continue
-
-        site, hostname, status, weight, code = vals[0], vals[1], vals[17], vals[18], vals[36]
+        site, hostname, status, weight, code = values[0], values[1], values[17], values[18], values[36]
 
         if site not in state:
             state[site] = {}
