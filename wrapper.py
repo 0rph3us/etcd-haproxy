@@ -4,7 +4,9 @@ import os
 import etcd
 import time
 import json
+import socket
 import hashlib
+import commands
 import subprocess
 from collections import namedtuple
 
@@ -34,6 +36,42 @@ def getWeight(component, version):
     except etcd.EtcdKeyNotFound:
         return 0
 
+def getStats(SOCKET):
+    status = commands.getstatusoutput('echo "show stat" | socat {} stdio'.format(SOCKET))
+    lines = status[1].split('\n')
+    state, servers = {}, {}
+    for l in lines:
+
+        vals = l.split(',')
+        if SOCKET in l or len(vals) == 1:
+            print 'debug %s' % l
+            continue
+
+        if vals[0].startswith('#') or vals[0] == '':
+            continue
+
+        if vals[1] == 'FRONTEND':
+            end = 'f'
+            continue
+        elif vals[1] == 'BACKEND':
+            end = 'b'
+            continue
+
+        site, hostname, status, weight, code = vals[0], vals[1], vals[17], vals[18], vals[36]
+
+        if site not in state:
+            state[site] = {}
+
+        state[site][hostname] = {
+            'status': status,
+            'weight': int(weight),
+            'code': code,
+        }
+
+    return state
+
+
+
 # stop running haproxy
 subprocess.Popen(['/usr/bin/pkill', 'haproxy'])
 
@@ -43,13 +81,15 @@ client = etcd.Client(host='127.0.0.1', port=2379, protocol='http')
 pid      = 90000000
 checksum = None
 template = 'template/haproxy.template'
+SOCKET   = '/tmp/haproxy.sock'
 
 while True:
     backends = {}
 
     config = ''
     http_frontend = ''
-    backend = ''
+    http_backend = ''
+    doReload = False
         
 
     try:
@@ -75,35 +115,46 @@ while True:
             if app not in backends:
                 backends[app] = {}
 
-            if server.version not in backends[app]:
+            if version not in backends[app]:
                 backends[app][version] = []
 
             backends[app][version].append(server)
-    
     
     # write routing 
     for app in backends:
         http_frontend = http_frontend + '   acl         ' + app + '     ' + 'hdr_dom(host) -i ' + app + '.spreadshirt.test\n'
         http_frontend = http_frontend + '   use_backend ' + app + '     ' + 'if ' + app + '\n\n'
     
+    state = getStats(SOCKET)
+    command = []
+
     # write backends
     for app in backends:
-        backend = backend + 'backend ' + app + '\n'
+        http_backend = http_backend + 'backend ' + app + '\n'
         for version in backends[app]:
             ratio  = getWeight(app, version)
             num    = len(backends[app][version])
-            
             weight = int(((float(ratio) / 100.0) / num) * 100)
-            
-            for server in backends[app][version]:
-                backend = backend + server.getHAProxyString() + str(weight) + '\n'
-        
 
+            for server in backends[app][version]:
+                http_backend = http_backend + server.getHAProxyString() + str(weight) + '\n'
+                try:
+                    if server.name in state[app].keys() and doReload == False:
+                        # change only the weight, if needed
+                        if state[app][server.name]['weight'] != weight:
+                            command.append('set weight {}/{} {}'.format( app, server.name, weight))
+                    else:
+                        doReload = True
+                except Exception as e:
+                    doReload = True
+                    print state
+                    print 'Error in write backends: %s' % e
+        
     # load template and generate new config
     f = open(template, 'r')
     config = f.read()
     config = config.replace('###HTTP_FRONTEND###', http_frontend)
-    config = config.replace('###BACKENDS###', backend)
+    config = config.replace('###BACKENDS###', http_backend)
     f.close()
     
     md5 = hashlib.md5()
@@ -114,14 +165,20 @@ while True:
         f = open('haproxy.cfg', 'wb')
         f.write(config)
         f.close()
-
         checksum = new_sum
 
+    if doReload is True:
         print 'Reload config'
         pipe = subprocess.Popen(['/usr/sbin/haproxy', '-f', 'haproxy.cfg', '-q', '-sf', str(pid)])
         pid  = pipe.pid
         print 'done'
 
+    if doReload is False:
+        if command:
+            print 'Reconfigure HAProxy on the fly'
+            print command
+            status = commands.getstatusoutput('echo "%s" | socat stdio %s' % ( '; '.join( command ), SOCKET ) )
+            print status
+
     print 'sleep'
-    print config
     time.sleep(5)
