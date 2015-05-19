@@ -86,10 +86,12 @@ def main(argv):
         sys.exit()
 
     try:
-        # write default weight
+        # refresh weight
         weight = etcd_client.read(etcdPrefix + app_version + '/weight').value
+        etcd_client.write(etcdPrefix + app_version + '/weight', '0' , ttl=3600)
         print 'weight for ' + app_name + ' (' + app_version + ') is ' + weight 
     except etcd.EtcdKeyNotFound:
+        # write default weight
         print 'No default weight found. Set default weight to 0'
         etcd_client.write(etcdPrefix + app_version + '/weight', '0' , ttl=3600)
         
