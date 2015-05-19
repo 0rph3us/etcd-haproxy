@@ -42,32 +42,16 @@ client = etcd.Client(host='127.0.0.1', port=2379, protocol='http')
 
 pid      = 90000000
 checksum = None
+template = 'template/haproxy.template'
 
 while True:
-    config = '''\
-global
-    maxconn 4096
-    stats socket /tmp/haproxysock level admin
-
-defaults
-    log global
-    mode    http
-    option  httplog
-    option  dontlognull
-    retries 3
-    option redispatch
-    maxconn 2000
-    contimeout  5000
-    clitimeout  50000
-    srvtimeout  50000
-    monitor-uri /haproxy/status
-    stats scope .
-
-frontend http 0.0.0.0:8080
-
-'''
-    
     backends = {}
+
+    config = ''
+    http_frontend = ''
+    backend = ''
+        
+
     try:
         r = client.read('/haproxy/backends', recursive=True, sorted=True)
     except:
@@ -99,13 +83,12 @@ frontend http 0.0.0.0:8080
     
     # write routing 
     for app in backends:
-        config = config + '   acl         ' + app + '     ' + 'hdr_dom(host) -i ' + app + '.spreadshirt.test\n'
-        config = config + '   use_backend ' + app + '     ' + 'if ' + app + '\n\n'
-    config = config + '\n\n'
+        http_frontend = http_frontend + '   acl         ' + app + '     ' + 'hdr_dom(host) -i ' + app + '.spreadshirt.test\n'
+        http_frontend = http_frontend + '   use_backend ' + app + '     ' + 'if ' + app + '\n\n'
     
     # write backends
     for app in backends:
-        config = config + 'backend ' + app + '\n'
+        backend = backend + 'backend ' + app + '\n'
         for version in backends[app]:
             ratio  = getWeight(app, version)
             num    = len(backends[app][version])
@@ -113,22 +96,16 @@ frontend http 0.0.0.0:8080
             weight = int(((float(ratio) / 100.0) / num) * 100)
             
             for server in backends[app][version]:
-                config = config + server.getHAProxyString() + str(weight) + '\n'
+                backend = backend + server.getHAProxyString() + str(weight) + '\n'
         
-        config = config + '\n\n'
+
+    # load template and generate new config
+    f = open(template, 'r')
+    config = f.read()
+    config = config.replace('###HTTP_FRONTEND###', http_frontend)
+    config = config.replace('###BACKENDS###', backend)
+    f.close()
     
-    # write monitor section
-    config = config + '''\
-listen admin:8000 *:8000
-     stats enable
-     stats hide-version
-     stats show-legends
-     stats realm Haproxy\ Statistics
-     stats uri /haproxy?stats
-     stats refresh 3s
-
-'''
-
     md5 = hashlib.md5()
     md5.update(config)
     new_sum = md5.hexdigest()

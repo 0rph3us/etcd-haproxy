@@ -16,10 +16,6 @@ defaults
     monitor-uri /haproxy/status
     stats scope .
 
-frontend http 0.0.0.0:8080
-###HTTP_FRONTEND##
-
-
 
 listen admin:8000 *:8000
      stats enable
@@ -29,4 +25,8 @@ listen admin:8000 *:8000
      stats uri /haproxy?stats
      stats refresh 3s
 
-##BACKENDS##
+
+frontend http 0.0.0.0:8080
+
+###HTTP_FRONTEND###
+###BACKENDS###
