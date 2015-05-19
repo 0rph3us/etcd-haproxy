@@ -119,6 +119,11 @@ while True:
                 backends[app][version] = []
 
             backends[app][version].append(server)
+        elif child.value is None:
+            # delete keys without value
+            print 'delete key without value %s' % child.key
+            client.delete(child.key, dir=True)
+
     
     # write routing 
     for app in backends:
