@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python -W all
 
 import os
 import etcd
@@ -143,16 +143,15 @@ while True:
 
             for server in backends[app][version]:
                 http_backend = http_backend + server.getHAProxyString() + str(weight) + '\n'
-                try:
-                    if server.name in state[app].keys() and doReload == False:
-                        # change only the weight, if needed
-                        if state[app][server.name]['weight'] != weight:
-                            command.append('set weight {}/{} {}'.format( app, server.name, weight))
-                    else:
-                        doReload = True
-                except Exception as e:
+
+                # check if the keys are included in dictionary
+                #   no try-except-block needed -> lazy evaluation
+                if app in state.keys() and server.name in state[app].keys() and doReload == False:
+                    # change only the weight, if needed
+                    if state[app][server.name]['weight'] != weight:
+                        command.append('set weight {}/{} {}'.format( app, server.name, weight))
+                else:
                     doReload = True
-                    print 'Error in write backends: %s' % e
         
     # load template and generate new config
     f = open(template, 'r')
