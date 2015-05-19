@@ -1,0 +1,32 @@
+global
+    maxconn 4096
+    stats socket /tmp/haproxysock level admin
+
+defaults
+    log global
+    mode    http
+    option  httplog
+    option  dontlognull
+    retries 3
+    option redispatch
+    maxconn 2000
+    contimeout  5000
+    clitimeout  50000
+    srvtimeout  50000
+    monitor-uri /haproxy/status
+    stats scope .
+
+frontend http 0.0.0.0:8080
+###HTTP_FRONTEND##
+
+
+
+listen admin:8000 *:8000
+     stats enable
+     stats hide-version
+     stats show-legends
+     stats realm Haproxy\ Statistics
+     stats uri /haproxy?stats
+     stats refresh 3s
+
+##BACKENDS##
