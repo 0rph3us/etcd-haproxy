@@ -44,7 +44,6 @@ def getStats(SOCKET):
 
         vals = l.split(',')
         if SOCKET in l or len(vals) == 1:
-            print 'debug %s' % l
             continue
 
         if vals[0].startswith('#') or vals[0] == '':
@@ -82,6 +81,7 @@ pid      = 90000000
 checksum = None
 template = 'template/haproxy.template'
 SOCKET   = '/tmp/haproxy.sock'
+running  = False
 
 while True:
     backends = {}
@@ -147,7 +147,6 @@ while True:
                         doReload = True
                 except Exception as e:
                     doReload = True
-                    print state
                     print 'Error in write backends: %s' % e
         
     # load template and generate new config
@@ -155,6 +154,7 @@ while True:
     config = f.read()
     config = config.replace('###HTTP_FRONTEND###', http_frontend)
     config = config.replace('###BACKENDS###', http_backend)
+    config = config.replace('###SOCKET###', SOCKET)
     f.close()
     
     md5 = hashlib.md5()
@@ -162,16 +162,17 @@ while True:
     new_sum = md5.hexdigest()
 
     if checksum != new_sum:
+        print 'write new config'
         f = open('haproxy.cfg', 'wb')
         f.write(config)
         f.close()
         checksum = new_sum
 
-    if doReload is True:
+    if doReload is True or running is False:
         print 'Reload config'
-        pipe = subprocess.Popen(['/usr/sbin/haproxy', '-f', 'haproxy.cfg', '-q', '-sf', str(pid)])
-        pid  = pipe.pid
-        print 'done'
+        pipe    = subprocess.Popen(['/usr/sbin/haproxy', '-f', 'haproxy.cfg', '-q', '-sf', str(pid)])
+        pid     = pipe.pid
+        running = True
 
     if doReload is False:
         if command:

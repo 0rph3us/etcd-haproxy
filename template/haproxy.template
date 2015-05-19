@@ -1,6 +1,6 @@
 global
     maxconn 4096
-    stats socket /tmp/haproxy.sock level admin
+    stats socket ###SOCKET### level admin
 
 defaults
     log global
