@@ -36,14 +36,14 @@ def getWeight(component, version):
     except etcd.EtcdKeyNotFound:
         return 0
 
-def getStats(SOCKET):
-    status = commands.getstatusoutput('echo "show stat" | socat {} stdio'.format(SOCKET))
+def getStats(socketFile):
+    status = commands.getstatusoutput('echo "show stat" | socat {} stdio'.format(socketFile))
     lines = status[1].split('\n')
     state, servers = {}, {}
     for l in lines:
 
         vals = l.split(',')
-        if SOCKET in l or len(vals) == 1:
+        if socketFile in l or len(vals) == 1:
             continue
 
         if vals[0].startswith('#') or vals[0] == '':
@@ -77,11 +77,11 @@ subprocess.Popen(['/usr/bin/pkill', 'haproxy'])
 
 client = etcd.Client(host='127.0.0.1', port=2379, protocol='http')
 
-pid      = 90000000
-checksum = None
-template = 'template/haproxy.template'
-SOCKET   = '/tmp/haproxy.sock'
-running  = False
+pid        = 90000000
+checksum   = None
+template   = 'template/haproxy.template'
+socketFile = '/tmp/haproxy.sock'
+running    = False
 
 while True:
     backends = {}
@@ -130,7 +130,7 @@ while True:
         http_frontend = http_frontend + '   acl         ' + app + '     ' + 'hdr_dom(host) -i ' + app + '.spreadshirt.test\n'
         http_frontend = http_frontend + '   use_backend ' + app + '     ' + 'if ' + app + '\n\n'
     
-    state = getStats(SOCKET)
+    state = getStats(socketFile)
     command = []
 
     # write backends
@@ -158,7 +158,7 @@ while True:
     config = f.read()
     config = config.replace('###HTTP_FRONTEND###', http_frontend)
     config = config.replace('###BACKENDS###', http_backend)
-    config = config.replace('###SOCKET###', SOCKET)
+    config = config.replace('###SOCKET###', socketFile)
     f.close()
     
     md5 = hashlib.md5()
@@ -182,7 +182,7 @@ while True:
         if command:
             print 'Reconfigure HAProxy on the fly'
             print command
-            status = commands.getstatusoutput('echo "%s" | socat stdio %s' % ( '; '.join( command ), SOCKET ) )
+            status = commands.getstatusoutput('echo "%s" | socat stdio %s' % ( '; '.join(command), socketFile))
             print status
 
     print 'sleep'
