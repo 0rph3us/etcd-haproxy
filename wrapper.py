@@ -173,6 +173,7 @@ while True:
                         command.append('set weight {}/{} {}'.format( app, server.name, weight))
                 else:
                     doReload = True
+            http_backend += '\n\n'
         
     # load template and generate new config
     f = open(template, 'r')
