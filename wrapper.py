@@ -149,8 +149,7 @@ while True:
     
     # write routing 
     for app in backends:
-        http_frontend = http_frontend + '   acl         ' + app + '     ' + 'hdr_dom(host) -i ' + app + '.spreadshirt.test\n'
-        http_frontend = http_frontend + '   use_backend ' + app + '     ' + 'if ' + app + '\n\n'
+        http_frontend = http_frontend + '   use_backend ' + app + '     ' + 'if {{ hdr_dom(host) str -m {}.domain }}\n'.format(app)
     
     state = getStats(socketFile)
     command = []
