@@ -52,20 +52,23 @@ def main(argv):
     app_name    = ''
 
     try:
-        opts, args = getopt.getopt(argv,'n:V:')
+        opts, args = getopt.getopt(argv,'n:V:t:')
     except getopt.GetoptError:
-        print 'test.py -n <app name> -V <app version>'
+        print 'test.py -n <app name> -V <app version> [-t <ttl>]'
         sys.exit(2)
 
-    if len(opts) != 2:
-        print 'test.py -n <app name> -V <app version>'
+    if len(opts) < 2:
+        print 'test.py -n <app name> -V <app version> [-t <ttl>]'
         sys.exit(2)
 
+    ttl = 3600
     for opt, arg in opts:
         if opt in ('-V'):
             app_version = arg
         elif opt in ('-n'):
             app_name = arg
+        elif opt in ('-t'):
+            ttl = int(arg)
 
     etcdPrefix = '/haproxy/backends/{}/'.format(app_name)
     
@@ -79,7 +82,7 @@ def main(argv):
         etcdValue = Realserver(name, ip, port)
 
         etcd_client = etcd.Client(host='127.0.0.1', port=2379, protocol='http')
-        etcd_client.write(etcdKey, etcdValue, ttl=3600)
+        etcd_client.write(etcdKey, etcdValue, ttl=ttl)
 
     except Exception as e:
         print 'Error: {}'.format(e)
@@ -88,12 +91,12 @@ def main(argv):
     try:
         # refresh weight
         weight = etcd_client.read(etcdPrefix + app_version + '/weight').value
-        etcd_client.write(etcdPrefix + app_version + '/weight', weight, ttl=3600)
+        etcd_client.write(etcdPrefix + app_version + '/weight', weight, ttl=ttl)
         print 'weight for ' + app_name + ' (' + app_version + ') is ' + weight 
     except etcd.EtcdKeyNotFound:
         # write default weight
         print 'No default weight found. Set default weight to 0'
-        etcd_client.write(etcdPrefix + app_version + '/weight', '0' , ttl=3600)
+        etcd_client.write(etcdPrefix + app_version + '/weight', '0' , ttl=ttl)
         
 
     print 'Starting ' + app_name + ' ('  + app_version + ')'
