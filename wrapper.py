@@ -8,13 +8,14 @@ import hashlib
 import subprocess
 
 # global variables
-RECV_SIZE = 1024
+RECV_SIZE        = 1024
 
 class Realserver:
-    name = ''
-    ip = ''
-    port = ''
+    name    = ''
+    ip      = ''
+    port    = ''
     version = None
+    status  = None
 
     def __init__(self, name, ip, port, version = ''):
         self.name    = name
@@ -27,6 +28,9 @@ class Realserver:
     def getHAProxyString(self):
         connect = '{}:{}'.format(self.ip, self.port)
         return '     server {} {} maxconn 32 check weight '.format(self.name, connect)
+
+    def setStatus(self, status):
+        self.status = status
 
 
 def getWeight(component, version):
@@ -158,8 +162,14 @@ while True:
     for app in backends:
         http_backend = http_backend + 'backend ' + app + '\n'
         for version in backends[app]:
+            ## get number of not online servers
+            offline = 0
+            for server in backends[app][version]:
+                if app in state.keys() and server.name in state[app].keys() and state[app][server.name]['status'] == 'DOWN':
+                    offline += 1
+
             ratio  = getWeight(app, version)
-            num    = len(backends[app][version])
+            num    = len(backends[app][version]) - offline
             weight = int(((float(ratio) / 100.0) / num) * 100)
 
             for server in backends[app][version]:
