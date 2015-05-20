@@ -102,20 +102,21 @@ def getStats(socketFile):
 subprocess.Popen(['/usr/bin/pkill', 'haproxy'])
 
 
-client     = etcd.Client(host='127.0.0.1', port=2379, protocol='http')
-pid        = 90000000
-checksum   = None
-template   = 'template/haproxy.template'
-socketFile = '/tmp/haproxy.sock'
-running    = False
+client      = etcd.Client(host='127.0.0.1', port=2379, protocol='http')
+pid         = 90000000
+checksum    = None
+template    = 'template/haproxy.template'
+socketFile  = '/tmp/haproxy.sock'
+running     = False
+serverCount = 0
 
 while True:
-    backends = {}
-
-    config = ''
-    http_frontend = ''
-    http_backend = ''
-    doReload = False
+    backends       = {}
+    config         = ''
+    http_frontend  = ''
+    http_backend   = ''
+    doReload       = False
+    actServerCount = 0
         
 
     try:
@@ -145,6 +146,7 @@ while True:
                 backends[app][version] = []
 
             backends[app][version].append(server)
+            actServerCount += 1
         elif child.value is None:
             # delete keys without value
             print 'delete key without value %s' % child.key
@@ -170,6 +172,10 @@ while True:
 
             ratio  = getWeight(app, version)
             num    = len(backends[app][version]) - offline
+
+            if num == 0:
+                num = 1
+            
             weight = int(((float(ratio) / 100.0) / num) * 100)
 
             for server in backends[app][version]:
@@ -183,7 +189,7 @@ while True:
                         command.append('set weight {}/{} {}'.format( app, server.name, weight))
                 else:
                     doReload = True
-            http_backend += '\n\n'
+        http_backend += '\n\n'
         
     # load template and generate new config
     f = open(template, 'r')
@@ -204,16 +210,16 @@ while True:
         f.close()
         checksum = new_sum
 
-    if doReload is True or running is False:
+    if doReload is True or running is False or actServerCount < serverCount:
         print 'Reload config'
-        pipe    = subprocess.Popen(['/usr/sbin/haproxy', '-f', 'haproxy.cfg', '-q', '-sf', str(pid)])
-        pid     = pipe.pid
-        running = True
+        pipe        = subprocess.Popen(['/usr/sbin/haproxy', '-f', 'haproxy.cfg', '-q', '-sf', str(pid)])
+        pid         = pipe.pid
+        running     = True
+        serverCount = actServerCount
 
     if doReload is False:
         if command:
             print 'Reconfigure HAProxy on the fly'
             sendToSocket(socketFile, '; '.join(command))
 
-    print 'sleep'
     time.sleep(5)
