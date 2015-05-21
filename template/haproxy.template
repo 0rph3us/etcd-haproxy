@@ -19,7 +19,7 @@ defaults
     stats scope .
 
 
-listen admin:8000 *:8000
+listen admin:8000 *:8000 tfo
      stats enable
      stats hide-version
      stats show-legends
@@ -28,7 +28,7 @@ listen admin:8000 *:8000
      stats refresh 3s
 
 
-frontend http 0.0.0.0:8080
+frontend http 0.0.0.0:8080 tfo
 
 ###HTTP_FRONTEND###
 
